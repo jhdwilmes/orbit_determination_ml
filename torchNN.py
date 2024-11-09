@@ -73,18 +73,19 @@ class CNN1D(nn.Module): # need to verify this works
 
 
 class Trnsfrmr1(nn.Module):
-    def __init__(self,input_dim,output_dim,hidden_dims=(20,20),activation_fc=F.relu,hiddenlayers=1):
+    def __init__(self,input_dim,output_dim,hidden_dims=(20,20),activation_fc=F.relu,hiddenlayers=1,encoderlayers=1):
         super(Trnsfrmr1,self).__init__()
         self.activation_fc = activation_fc
         self.input_layer = nn.Linear(input_dim,hidden_dims[0])
         self.positional_encoding = PositionalEncoding(d_model=10)
         self.embedding = nn.Embedding(4,10)
         self.hiddenlayers = hiddenlayers
+        self.encoderlayers = encoderlayers
         # self.hidden_layers = nn.ModuleList()
         # self.t1 = nn.Transformer(input_dim,input_dim)
-        self.e1 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=20)#,activation=F.tanh)
-        self.e2 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=40)
-        self.e3 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=80)
+        self.e1 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=100) #,activation=F.tanh)
+        self.e2 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=80)
+        self.e3 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=60)
         # self.e3 = nn.TransformerEncoderLayer(hidden_dims[0],hidden_dims[0])
         # self.d1 = nn.TransformerDecoderLayer(hidden_dims[0],hidden_dims[0])
         # self.e2 = nn.TransformerEncoder(10,10)
@@ -108,11 +109,14 @@ class Trnsfrmr1(nn.Module):
         # x = self.positional_encoding(x)
         # src_mask = nn.Transformer.generate_square_subsequent_mask(len(x))
         # x = self.t1(x,src_mask)
-        x = self.e1(x)
+        if self.encoderlayers > 0:
+            x = self.e1(x)
         # x = self.activation_fc(self.fc3(x))
-        x = self.e2(x)
+        if self.encoderlayers > 1:
+            x = self.e2(x)
         # x = self.activation_fc(self.fc2(x))
-        x = self.e3(x)
+        if self.encoderlayers > 2:
+            x = self.e3(x)
         x = torch.flatten(x,1) # need to understand if this is correct - should be (N,something)
         # x = x.unsqueeze(0) # weird hack
         if self.hiddenlayers == 2:
@@ -122,18 +126,38 @@ class Trnsfrmr1(nn.Module):
             x = self.activation_fc(self.fc1(x))
             x = self.activation_fc(self.fc2(x))
             x = self.activation_fc(self.fc3(x))
-        else:
+        elif self.hiddenlayers == 1:
             x = self.activation_fc(self.fc0(x))
         x = self.output_layer(x)
         return x
 
 
 class Trnsfrmr2(nn.Module):
-    def __init__(self,input_dim,output_dim,hidden_dims = [6,6],feedforward_dim = 9,activation_fc=F.relu):
+    def __init__(self,input_dim,output_dim,hidden_dims=(20,20),activation_fc=F.relu,hiddenlayers=1,encoderlayers=3):
         super(Trnsfrmr2,self).__init__()
         self.activation_fc = activation_fc
-        self.transformer = nn.Transformer(input_dim,input_dim,hidden_dims[0],hidden_dims[1],feedforward_dim,activation=activation_fc)
-        self.outputer = nn.Linear(input_dim,output_dim)
+        self.input_layer = nn.Linear(input_dim,hidden_dims[0])
+        self.positional_encoding = PositionalEncoding(d_model=10)
+        self.embedding = nn.Embedding(4,10)
+        self.hiddenlayers = hiddenlayers
+        self.encoderlayers = encoderlayers
+        # self.hidden_layers = nn.ModuleList()
+        # self.t1 = nn.Transformer(input_dim,input_dim)
+        self.e1 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=hidden_dims[0])#,activation=F.tanh)
+        self.e2 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=hidden_dims[1])
+        self.e3 = nn.TransformerEncoderLayer(input_dim,input_dim,dim_feedforward=20)
+        # self.d1 = nn.TransformerDecoderLayer()
+        # self.e3 = nn.TransformerEncoderLayer(hidden_dims[0],hidden_dims[0])
+        # self.d1 = nn.TransformerDecoderLayer(hidden_dims[0],hidden_dims[0])
+        # self.e2 = nn.TransformerEncoder(10,10)
+        # self.d2 = nn.TransformerDecoder(10,10)
+        # self.fc1 = nn.Linear(6,13) # need to work on this layer
+        self.fc0 = nn.Linear(input_dim+input_dim,input_dim)
+        self.fc1 = nn.Linear(input_dim+input_dim,hidden_dims[0])
+        self.fc2 = nn.Linear(hidden_dims[0],hidden_dims[1])
+        self.fc3 = nn.Linear(hidden_dims[1],input_dim)
+        self.fc4 = nn.Linear(hidden_dims[0],input_dim)
+        self.output_layer = nn.Linear(input_dim,output_dim)
 
 
     def forward(self,state,mask=None):
@@ -142,8 +166,31 @@ class Trnsfrmr2(nn.Module):
             x = torch.tensor(x,dtype=torch.float32)#,device=self.device)
         if(len(x.shape) == 1):
             x = x.unsqueeze(0)
-        x = self.transformer(x)
-        x = self.outputer(x)
+        xsave = x
+        # x = x.unsqueeze(1) # not sure if this is right?
+        # x = self.positional_encoding(x)
+        # src_mask = nn.Transformer.generate_square_subsequent_mask(len(x))
+        # x = self.t1(x,src_mask)
+        if self.encoderlayers > 0:
+            x = self.e1(x)
+        # x = self.activation_fc(self.fc3(x))
+        if self.encoderlayers > 1:
+            x = self.e2(x)
+        # x = self.activation_fc(self.fc2(x))
+        if self.encoderlayers > 2:
+            x = self.e3(x)
+        x = torch.flatten(x,1) # need to understand if this is correct - should be (N,something)
+        # x = x.unsqueeze(0) # weird hack
+        if self.hiddenlayers == 2:
+            x = self.activation_fc(self.fc1(torch.stack([torch.concat([x[0],xsave[0]])])))
+            x = self.activation_fc(self.fc4(x))
+        elif self.hiddenlayers == 3:
+            x = self.activation_fc(self.fc1(torch.stack([torch.concat([x[0],xsave[0]])])))
+            x = self.activation_fc(self.fc2(x))
+            x = self.activation_fc(self.fc3(x))
+        else:
+            x = self.activation_fc(self.fc0(torch.stack([torch.concat([x[0],xsave[0]])])))
+        x = self.output_layer(x)
         return x
 
 
@@ -327,17 +374,18 @@ class transformer(nn.Module): #https://pytorch.org/tutorials/beginner/transforme
 
 
 class RNN1(nn.Module):
-    def __init__(self,input_dim,output_dim,hidden_dims=(15,9),activation_fc=F.relu):
+    def __init__(self,input_dim,output_dim,hidden_dims=(20,20),activation_fc=F.relu,rnnsets=1,layersperset=3,bidirection=False):
         super(RNN1,self).__init__()
         self.activation_fc = activation_fc
+        self.rnnsets = rnnsets
         self.input_layer = nn.Linear(input_dim,hidden_dims[0])
         # self.hidden_layers = nn.ModuleList()
         self.positional_encoding = PositionalEncoding(d_model=10)
         self.embedding = nn.Embedding(4,10)
-        self.r0 = nn.RNN(input_dim,hidden_dims[0],3)
-        self.r1 = nn.RNN(hidden_dims[0],hidden_dims[0],3)#,nonlinearity='relu')
-        self.r2 = nn.RNN(hidden_dims[0],hidden_dims[0],3)#,nonlinearity='relu')
-        self.r3 = nn.RNN(hidden_dims[0],hidden_dims[0],3)#,nonlinearity='relu')
+        self.r0 = nn.RNN(input_dim,hidden_dims[0],layersperset,dropout=0.1,bidirectional=bidirection)
+        self.r1 = nn.RNN(hidden_dims[0],hidden_dims[0],layersperset,dropout=0.1,bidirectional=bidirection)#,nonlinearity='relu')
+        self.r2 = nn.RNN(hidden_dims[0],hidden_dims[0],layersperset,dropout=0.1,bidirectional=bidirection)#,nonlinearity='relu')
+        self.r3 = nn.RNN(hidden_dims[0],hidden_dims[0],layersperset,dropout=0.1,bidirectional=bidirection)#,nonlinearity='relu')
         self.fc1 = nn.Linear(hidden_dims[0],hidden_dims[0])
         self.fc2 = nn.Linear(hidden_dims[0],hidden_dims[-1])
         self.output_layer = nn.Linear(hidden_dims[-1],output_dim)
@@ -357,10 +405,14 @@ class RNN1(nn.Module):
         # x = self.activation_fc(self.r1(x))
         # h0 = torch.autograd.Variable(torch.zeros(10,x.size(0),10))
         # hn = x*0
-        x, hn = self.r0(x)#,hn)#,h0)
-        x,hn = self.r1(x,hn)
-        x,hn = self.r2(x,hn)
-        x,hn = self.r3(x,hn)
+        if self.rnnsets > 0:
+            x,hn = self.r0(x)#,hn)#,h0)
+        if self.rnnsets > 1:
+            x,hn = self.r1(x,hn)
+        if self.rnnsets > 2:
+            x,hn = self.r2(x,hn)
+        if self.rnnsets > 3:
+            x,hn = self.r3(x,hn)
         # x,hn = self.r2(x,hn)
         # x,hn = self.r1(x)#,hn)#,h0)
         # x = self.activation_fc(self.r2(x))
@@ -469,6 +521,7 @@ class RNN1(nn.Module):
 #         u = u.detach()#.cpu().numpy()
 #         f = f.detach()#.cpu().numpy()
 #         return u, f
+
 
 class angleCalc(torch.autograd.Function):
     @staticmethod
@@ -803,33 +856,46 @@ class MLdataManipulation():
             Dtrain = np.transpose([np.sin(siderealtime[0:-1].astype(np.float64) * d2r),np.cos(siderealtime[0:-1].astype(np.float64) * d2r), np.sin(observer[1][0:-1].astype(np.float64) * d2r), np.cos(observer[1][0:-1].astype(np.float64) * d2r), np.sin(observer[2][0:-1].astype(np.float64) * d2r), np.cos(observer[2][0:-1].astype(np.float64) * d2r), np.sin(observer[8][0:-1].astype(np.float64) * d2r), np.cos(observer[8][0:-1].astype(np.float64) * d2r), np.sin(observer[9][0:-1].astype(np.float64) * d2r), np.cos(observer[9][0:-1].astype(np.float64) * d2r),
                                    np.sin(siderealtime[1:].astype(np.float64) * d2r),np.cos(siderealtime[1:].astype(np.float64) * d2r), np.sin(observer[1][1:].astype(np.float64) * d2r), np.cos(observer[1][1:].astype(np.float64) * d2r), np.sin(observer[2][1:].astype(np.float64) * d2r), np.cos(observer[2][1:].astype(np.float64) * d2r), np.sin(observer[8][1:].astype(np.float64) * d2r), np.cos(observer[8][1:].astype(np.float64) * d2r), np.sin(observer[9][1:].astype(np.float64) * d2r), np.cos(observer[9][1:].astype(np.float64) * d2r)]) # normalize data
             Rtrain = np.array(observer[3] / rangenorm ) # normalize range
+        elif dataseting == 6:
+            Dtrain = np.transpose([np.sin(siderealtime[0:-2].astype(np.float64) * d2r),np.cos(siderealtime[0:-2].astype(np.float64) * d2r), np.sin(observer[1][0:-2].astype(np.float64) * d2r), np.cos(observer[1][0:-2].astype(np.float64) * d2r), np.sin(observer[2][0:-2].astype(np.float64) * d2r), np.cos(observer[2][0:-2].astype(np.float64) * d2r), np.sin(observer[8][0:-2].astype(np.float64) * d2r), np.cos(observer[8][0:-2].astype(np.float64) * d2r), np.sin(observer[9][0:-2].astype(np.float64) * d2r), np.cos(observer[9][0:-2].astype(np.float64) * d2r),
+                                   np.sin(siderealtime[1:-1].astype(np.float64) * d2r),np.cos(siderealtime[1:-1].astype(np.float64) * d2r), np.sin(observer[1][1:-1].astype(np.float64) * d2r), np.cos(observer[1][1:-1].astype(np.float64) * d2r), np.sin(observer[2][1:-1].astype(np.float64) * d2r), np.cos(observer[2][1:-1].astype(np.float64) * d2r), np.sin(observer[8][1:-1].astype(np.float64) * d2r), np.cos(observer[8][1:-1].astype(np.float64) * d2r), np.sin(observer[9][1:-1].astype(np.float64) * d2r), np.cos(observer[9][1:-1].astype(np.float64) * d2r),
+                                   np.sin(siderealtime[2:].astype(np.float64) * d2r),np.cos(siderealtime[2:].astype(np.float64) * d2r), np.sin(observer[1][2:].astype(np.float64) * d2r), np.cos(observer[1][2:].astype(np.float64) * d2r), np.sin(observer[2][2:].astype(np.float64) * d2r), np.cos(observer[2][2:].astype(np.float64) * d2r), np.sin(observer[8][2:].astype(np.float64) * d2r), np.cos(observer[8][2:].astype(np.float64) * d2r), np.sin(observer[9][2:].astype(np.float64) * d2r), np.cos(observer[9][2:].astype(np.float64) * d2r)]) # normalize data
+            Rtrain = np.array(observer[3] / rangenorm ) # normalize range
         elif dataseting == 1:
-            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64) / (2*np.pi),observer[1][0:-1].astype(np.float64) / 360,observer[2][0:-1].astype(np.float64) /360,observer[8][0:-1].astype(np.float64) / 360,observer[9][0:-1].astype(np.float64) / 360,siderealtime[1:].astype(np.float64) / (2*np.pi),observer[1][1:].astype(np.float64) / 360,observer[2][1:].astype(np.float64) /360,observer[8][1:].astype(np.float64) / 360,observer[9][1:].astype(np.float64) / 360]) # normalize data
+            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64) / (2*np.pi),observer[1][0:-1].astype(np.float64) / 360,observer[2][0:-1].astype(np.float64) / 360,observer[8][0:-1].astype(np.float64) / 360,observer[9][0:-1].astype(np.float64) / 360,siderealtime[1:].astype(np.float64) / (2*np.pi),observer[1][1:].astype(np.float64) / 360,observer[2][1:].astype(np.float64) /360,observer[8][1:].astype(np.float64) / 360,observer[9][1:].astype(np.float64) / 360]) # normalize data
             Rtrain = np.array(observer[3][0:-1].astype(np.float64) / rangenorm ) # normalize range
         else:
-            Dtrain = np.transpose([siderealtime.astype(np.float64) / (2*np.pi),observer[1].astype(np.float64) / 360,observer[2].astype(np.float64) /360,observer[8].astype(np.float64) / 360,observer[9].astype(np.float64) / 360]) # normalize data
+            Dtrain = np.transpose([siderealtime.astype(np.float64) / (2*np.pi),observer[1].astype(np.float64) / 360,observer[2].astype(np.float64) / 360,observer[8].astype(np.float64) / 360,observer[9].astype(np.float64) / 360]) # normalize data
             Rtrain = np.array(observer[3].astype(np.float64) / rangenorm ) # normalize range
         return Dtrain, Rtrain
 
 
-    def grabInputNoNorm(self,observer,siderealtime,dataseting=0):
-        d2r = np.pi/180
+    def grabInputNoNorm(self,observer,siderealtime,dataseting=0,normalize=False):
+        d2r = 1.
+        if normalize:
+            d2r = np.pi/180
         if dataseting == 2:
-            Dtrain = np.transpose([siderealtime.astype(np.float64),observer[1].astype(np.float64),observer[1].astype(np.float64),observer[2].astype(np.float64),observer[2].astype(np.float64),observer[8].astype(np.float64),observer[8].astype(np.float64),observer[9].astype(np.float64),observer[9].astype(np.float64)]) # normalize data
+            Dtrain = np.transpose([siderealtime.astype(np.float64)*d2r,observer[1].astype(np.float64)*d2r,observer[1].astype(np.float64)*d2r,observer[2].astype(np.float64)*d2r,observer[2].astype(np.float64)*d2r,observer[8].astype(np.float64)*d2r,observer[8].astype(np.float64)*d2r,observer[9].astype(np.float64)*d2r,observer[9].astype(np.float64)*d2r]) # normalize data
             Rtrain = np.array(observer[3])
         elif dataseting == 3:
-            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64), observer[1][0:-1].astype(np.float64), observer[1][0:-1].astype(np.float64), observer[2][0:-1].astype(np.float64), observer[2][0:-1].astype(np.float64), observer[8][0:-1].astype(np.float64), observer[8][0:-1].astype(np.float64),observer[9][0:-1].astype(np.float64),observer[9][0:-1].astype(np.float64),
-                    siderealtime[1:].astype(np.float64), observer[1][1:].astype(np.float64),observer[1][1:].astype(np.float64),observer[2][1:].astype(np.float64), observer[2][1:].astype(np.float64) ,observer[8][1:].astype(np.float64) ,observer[8][1:].astype(np.float64),observer[9][1:].astype(np.float64),observer[9][1:].astype(np.float64)]) # normalize data
+            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64)*d2r, observer[1][0:-1].astype(np.float64)*d2r, observer[1][0:-1].astype(np.float64)*d2r, observer[2][0:-1].astype(np.float64)*d2r, observer[2][0:-1].astype(np.float64)*d2r, observer[8][0:-1].astype(np.float64)*d2r, observer[8][0:-1].astype(np.float64)*d2r,observer[9][0:-1].astype(np.float64)*d2r,observer[9][0:-1].astype(np.float64)*d2r,
+                    siderealtime[1:].astype(np.float64)*d2r, observer[1][1:].astype(np.float64)*d2r,observer[1][1:].astype(np.float64)*d2r,observer[2][1:].astype(np.float64)*d2r, observer[2][1:].astype(np.float64)*d2r,observer[8][1:].astype(np.float64)*d2r,observer[8][1:].astype(np.float64)*d2r,observer[9][1:].astype(np.float64)*d2r,observer[9][1:].astype(np.float64)*d2r]) # normalize data
             Rtrain = np.array(observer[3])
         elif dataseting == 1:
-            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64),observer[1][0:-1].astype(np.float64),observer[2][0:-1].astype(np.float64) ,observer[8][0:-1].astype(np.float64),observer[9][0:-1].astype(np.float64),siderealtime[1:].astype(np.float64),observer[1][1:].astype(np.float64),observer[2][1:].astype(np.float64),observer[8][1:].astype(np.float64),observer[9][1:].astype(np.float64)]) # normalize data
+            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64)*d2r,observer[1][0:-1].astype(np.float64)*d2r,observer[2][0:-1].astype(np.float64)*d2r,observer[8][0:-1].astype(np.float64)*d2r,observer[9][0:-1].astype(np.float64)*d2r,siderealtime[1:].astype(np.float64)*d2r,observer[1][1:].astype(np.float64)*d2r,observer[2][1:].astype(np.float64)*d2r,observer[8][1:].astype(np.float64)*d2r,observer[9][1:].astype(np.float64)*d2r]) # normalize data
             Rtrain = np.array(observer[3][0:-1].astype(np.float64)) # normalize range
         elif dataseting == 5:
-            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64),observer[1][0:-1].astype(np.float64),observer[2][0:-1].astype(np.float64),observer[8][0:-1].astype(np.float64),observer[9][0:-1].astype(np.float64),
-                                   siderealtime[1:].astype(np.float64),observer[1][1:].astype(np.float64),observer[2][1:].astype(np.float64),observer[8][1:].astype(np.float64),observer[9][1:].astype(np.float64)]) # normalize data
-            Rtrain = np.array(observer[3].astype(np.float64)) # normalize range
+            Dtrain = np.transpose([siderealtime[0:-1].astype(np.float64)*d2r,observer[1][0:-1].astype(np.float64)*d2r,observer[2][0:-1].astype(np.float64)*d2r,observer[8][0:-1].astype(np.float64)*d2r,observer[9][0:-1].astype(np.float64)*d2r,
+                                   siderealtime[1:].astype(np.float64)*d2r,observer[1][1:].astype(np.float64)*d2r,observer[2][1:].astype(np.float64)*d2r,observer[8][1:].astype(np.float64)*d2r,observer[9][1:].astype(np.float64)*d2r]) # normalize data
+            Rtrain = np.array(observer[3][0:-1].astype(np.float64)) # normalize range
+        elif dataseting == 6:
+            Dtrain = np.transpose([siderealtime[0:-2].astype(np.float64)*d2r,observer[1][0:-2].astype(np.float64)*d2r,observer[2][0:-2].astype(np.float64)*d2r,observer[8][0:-2].astype(np.float64)*d2r,observer[9][0:-2].astype(np.float64)*d2r,
+                                   siderealtime[1:-1].astype(np.float64)*d2r,observer[1][1:-1].astype(np.float64)*d2r,observer[2][1:-1].astype(np.float64)*d2r,observer[8][1:-1].astype(np.float64)*d2r,observer[9][1:-1].astype(np.float64)*d2r,
+                                   siderealtime[2:].astype(np.float64)*d2r,observer[1][2:].astype(np.float64)*d2r,observer[2][2:].astype(np.float64)*d2r,observer[8][2:].astype(np.float64)*d2r,observer[9][2:].astype(np.float64)*d2r]) # normalize data
+            Rtrain = np.array(observer[3][1:-1].astype(np.float64)) # normalize range
         else:
-            Dtrain = np.transpose([siderealtime.astype(np.float64),observer[1].astype(np.float64),observer[2].astype(np.float64),observer[8].astype(np.float64),observer[9].astype(np.float64)]) # normalize data
+            Dtrain = np.transpose([siderealtime.astype(np.float64)*d2r,observer[1].astype(np.float64)*d2r,observer[2].astype(np.float64)*d2r,observer[8].astype(np.float64)*d2r,observer[9].astype(np.float64)*d2r]) # normalize data
             Rtrain = np.array(observer[3].astype(np.float64)) # normalize range
         return Dtrain, Rtrain
+
 

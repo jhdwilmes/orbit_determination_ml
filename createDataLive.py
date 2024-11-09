@@ -119,10 +119,46 @@ class TLEdata():
         ecc = float(tle[1][26:33]) / 1e7
         ap = float(tle[1][34:42])
         ma = float(tle[1][43:51])
-        mm = float(tle[1][52:67])
+        mm = float(tle[1][52:63])
         # p, ecc, inc, raan, argp, ta
         # mm, ecc, inc, raan, argp, ma
         return [mm, ecc, inc, raan, ap, ma]
+
+
+    def prunTLEs(self,MM=[0.001,20],E=[0,1],I=[-180,180],RAAN=[-360,360],AP=[-360,360],MA=[-360,360]):
+        # txt = ['1 00000U 00000A   00000.00000000 +.00000000 +00000-0 +00000-0 0 00000','2 00000 000.0000 000.0000 0000000 000.0000 000.0000 01.00000000000000']
+        # a =sources.get_predictor_from_tle_lines(txt)
+        if MM[0] < 1e-6:
+            MM[0] = 1e-6
+        ii = 0
+        lentles = len(self.tles)
+        while ii < lentles:
+            OE = self._createOEfromTLE(self.tles[ii].tle.lines)
+            if OE[0] <= MM[0] or OE[0] >= MM[1]: #self.tles[ii].period <= 1440/MM[1] or self.tles[ii].period >= 1440/MM[0]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            elif OE[1] <= E[0] or OE[1] >= E[1]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            elif OE[2] <= I[0] or OE[2] >= I[1]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            elif OE[3] <= RAAN[0] or OE[3] >= RAAN[1]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            elif OE[4] <= AP[0] or OE[4] >= AP[1]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            elif OE[5] <= MA[0] or OE[5] >= MA[1]:
+                self.tles.pop(ii)
+                ii-=1
+                lentles = len(self.tles)
+            ii+=1
 
 
     def readTLEfile(self,filename='tles/tle_custom.txt'):
@@ -242,7 +278,7 @@ class TLEdata():
         return observations, np.array(ecidata)
 
 
-    def oneTLEdata(self,tstep=60,selectrandtle=True,t0=np.nan,t1=np.nan,debug=True,tryagain=0,noise=0,maxObs=0,minObs=4):
+    def oneTLEdata(self,tstep=60,selecttle=-1,t0=np.nan,t1=np.nan,debug=True,tryagain=0,noise=0,maxObs=0,minObs=3):
         if np.isnan(t0) and np.isnan(t1):
             t0,t1 = self._createTLEtime()
         elif np.isnan(t1):
@@ -251,15 +287,17 @@ class TLEdata():
             t0 = t1 - datetime.timedelta(minutes=1440)
         #print(tles[0].get_position(t),tles[0].get_next_pass(uccs))
         #print(tles[0].passes_over(uccs,t0),uccs.get_azimuth_elev_deg(tles[0].get_position(t)))
-        ii = 0
+        nn = selecttle
 
         ltle = len(self.tles)
         dtrate = 0.5
+        
+        if ltle == 0:
+            self.createRandomOrbit()
 
         dsave = []
         stepstaken = 0
-        nn = ii
-        if(selectrandtle):
+        if(selecttle<0 or selecttle >= len(self.tles)):
             nn = np.random.randint(0,ltle)
         # print(ii,'/',ltle)
         tle = self.tles[nn]
@@ -273,11 +311,11 @@ class TLEdata():
                 obs, ecidata = self.propagateTLE(tle,t0,t1,tstep,dtrate,maxObs)
                 if len(obs) >= minObs:
                     break
-        if noise > 0:
-            noisechar = noise * np.array([0,1/60,1/60,5.0,1/60,1/60,1/60,1/60,1/30,1/30,1/30,1/30])
+        if noise > 1e-9:
+            noisechar = noise * np.array([0,1/60,1/60,10.0,1/60,1/60,1/60,1/60,1/30,1/30,1/30,1/30])
             for ii in range(len(obs)):
                 obs[ii][0:-1] = obs[ii][0:-1] + np.multiply(np.random.randn(len(noisechar)),noisechar)
         tleorbit = self._createOEfromTLE(tle.tle.lines)
         # truthdata = [ecidata, tleorbit]
-        return obs, ecidata, tleorbit
+        return np.array(obs), np.array(ecidata), np.array(tleorbit)
 

@@ -109,7 +109,7 @@ class orbitDetermination:
         return xi1
 
 
-    def GaussOrbitDetermination(self,timeset,angles,obsLocation,radecOrazel = 0):
+    def GaussOrbitDetermination(self,timeset,angles,obsLocation,radecOrazel = 0,iters=[0,1,2],onlyRange=False):
         if len(timeset) < 3:
             print('Insufficient data to calculate orbit')
             return([0,np.array([0,0,0]),np.array([0,0,0])])
@@ -142,22 +142,22 @@ class orbitDetermination:
         else:
             print('Need RaDec or AzEl angle coordinates inputed as the "angles" variable, and radecOrazel set to 0 for RaDec or 1 for AzEl.')
             return 1
-        T1 = times[0] - times[1] # tau_1 # assumed julian dates, meaning the result should be fractions of a day
-        T3 = times[2] - times[1] # tau_3
+        T1 = times[iters[0]] - times[iters[1]] # tau_1 # assumed julian dates, meaning the result should be fractions of a day
+        T3 = times[iters[2]] - times[iters[1]] # tau_3
         T = T3 - T1 # tau
         # convert time to seconds - note there might be numerical problems here if the time delta is too small
         T1 = T1 * 86400
         T3 = T3 * 86400
         T  = T * 86400
         # product vectors
-        p1 = np.cross(rhos[1],rhos[2]) # Rho2 x Rho3
-        p2 = np.cross(rhos[0],rhos[2]) # Rho1 x Rho3
-        p3 = np.cross(rhos[0],rhos[1]) # Rho1 x Rho2
-        D0 = np.dot(rhos[0],p1)
+        p1 = np.cross(rhos[iters[1]],rhos[iters[2]]) # Rho2 x Rho3
+        p2 = np.cross(rhos[iters[0]],rhos[iters[2]]) # Rho1 x Rho3
+        p3 = np.cross(rhos[iters[0]],rhos[iters[1]]) # Rho1 x Rho2
+        D0 = np.dot(rhos[iters[0]],p1)
         # label sensor locations at each time
-        R1 = Rs[0]
-        R2 = Rs[1]
-        R3 = Rs[2]
+        R1 = Rs[iters[0]]
+        R2 = Rs[iters[1]]
+        R3 = Rs[iters[2]]
         # create matrix coefficients
         D11 = np.dot(R1,p1)
         D12 = np.dot(R1,p2)
@@ -171,12 +171,14 @@ class orbitDetermination:
         # Range solution
         A = 1 / D0 * (-D12 * T3 / T + D22 + D32 * T1 / T)
         B = 1 / (6 * D0) * (D12 * (T3**2 - T**2) * T3 / T + D32 * (T**2 - T1**2) * T1 / T)
-        E = np.dot(R2,rhos[1])
+        E = np.dot(R2,rhos[iters[1]])
         R22 = np.dot(R2,R2)
         a = -(A**2 + 2 * A * E + R22)
         b = -2 * utils.MU_E * B * (A + E)
         c = -utils.MU_E**2 * B**2
         r2 = self.findRoot(a, b, c)
+        if onlyRange:
+            return r2
         # Velocity solution
         r1num = 6 * (D31 * T1 / T3 + D21 * T / T3) * r2**3 + utils.MU_E * D31 * (T**2 - T1**2) * T1 / T3
         r1denom = 6 * r2**3 + utils.MU_E * (T**2 - T3**2)
@@ -185,15 +187,15 @@ class orbitDetermination:
         r3num = 6 * (D13 * T3 / T1 - D23 * T / T1) * r2**3 + utils.MU_E * D13 * (T**2 - T3**2) * T3 / T1
         r3denom = 6 * r2**3 + utils.MU_E * (T**2 - T1**2)
         rho3 = 1 / D0 * (r3num / r3denom - D33)
-        x1 = R1 + rho1 * rhos[0]
-        x2 = R2 + rho2 * rhos[1]
-        x3 = R3 + rho3 * rhos[2]
+        x1 = R1 + rho1 * rhos[iters[0]]
+        x2 = R2 + rho2 * rhos[iters[1]]
+        x3 = R3 + rho3 * rhos[iters[2]]
         f1 = 1 - 0.5 * utils.MU_E * T1**2 / r2**3
         f3 = 1 - 0.5 * utils.MU_E * T3**2 / r2**3
         g1 = T1 - utils.MU_E / (6 * r2**3) * T1**3
         g3 = T3 - utils.MU_E / (6 * r2**3) * T3**3
         v2 = 1 / (f1 * g3 - f3 * g1) * (-f3 * x1 + f1 * x3)
-        return [times[1], x2, v2]
+        return [times[iters[1]], x2, v2]
 
 
     def StateVector2OrbitalElements(self,SV):
@@ -219,7 +221,8 @@ class orbitDetermination:
         return ((T/(2*utils.pi))**2 * utils.MU_E)**(1/3)
     
 
-    def OrbitElement2StateVector2(self,OE):
+    def OrbitElement2StateVector2(self,OEs):
+        OE = np.copy(OEs)
         T = OE[0]
         a = ((T/(2*utils.pi))**2 * utils.MU_E)**(1/3)
         OE [0] = a*(1-OE[1]**2)
@@ -229,7 +232,7 @@ class orbitDetermination:
     
 
     def StateVector2OrbitalElements2(self,SV):
-        OE = np.array(keplerian.rv2coe(utils.MU_E,SV[1],SV[2]))
+        OE = np.array(keplerian.rv2coe(utils.MU_E,np.copt(SV[1]),np.copy(SV[2])))
         a = OE[0]/(1-OE[1]**2)
         T = utils.pi*2*np.sqrt(a**3/utils.MU_E) # orbit period
         OE[0] = T
@@ -239,7 +242,7 @@ class orbitDetermination:
 
 
     def StateVector2OrbitalElements3(self,SV):
-        OE = np.array(keplerian.rv2coe(utils.MU_E,SV[1],SV[2]))
+        OE = np.array(keplerian.rv2coe(utils.MU_E,np.copt(SV[1]),np.copy(SV[2])))
         a = OE[0]/(1-OE[1]**2) # semi-major axis
         OE[0] = a
         if np.isnan(OE[0]):
@@ -248,16 +251,20 @@ class orbitDetermination:
 
 
     def StateVector2OrbitalElements4(self,SV):
-        OE = np.array(keplerian.rv2coe(utils.MU_E,SV[1],SV[2]))
+        OE = np.array(keplerian.rv2coe(utils.MU_E,np.copy(SV[1]),np.copy(SV[2])))
         a = OE[0]/(1-OE[1]**2)
-        T = utils.pi*2*np.sqrt(a**3/utils.MU_E) # orbit period
-        OE[0] = 86400/T
+        if OE[1] <= 1:
+            T = utils.pi*2*np.sqrt(a**3/utils.MU_E) # orbit period
+            OE[0] = 86400/T
+        else:
+            OE[0] = -utils.pi*2*np.sqrt(abs(a)**3/utils.MU_E)
         if np.isnan(OE[0]):
-            OE[0] = 0
+            OE[0] = -utils.pi*2*np.sqrt(abs(a)**3/utils.MU_E)
         return OE
     
 
-    def OrbitElement2StateVector3(self,OE):
+    def OrbitElement2StateVector3(self,OEs):
+        OE = np.copy(OEs)
         a = OE[0]
         OE[0] = a*(1-OE[1]**2)
         SV = np.array(keplerian.coe2rv(utils.MU_E,OE[0],OE[1],OE[2],OE[3],OE[4],OE[5]))
@@ -265,11 +272,16 @@ class orbitDetermination:
         return SV
 
 
-    def OrbitElement2StateVector4(self,OE):
+    def OrbitElement2StateVector4(self,OEs,verbose=False):
+        OE = np.copy(OEs)
         M = OE[0]
         T = 86400/M
         a = ((T/(2*utils.pi))**2 * utils.MU_E)**(1/3)
-        OE [0] = a*(1-OE[1]**2)
+        OE[0] = a*(1-OE[1]**2)
+        if OE[0] < 0:
+            OE[0] = -OE[0] # This gets the code to run, but the results are probably innacurate
+            if verbose:
+                print("Hyperbolic orbit, results innacurate")
         SV = np.array(keplerian.coe2rv(utils.MU_E,OE[0],OE[1],OE[2],OE[3],OE[4],OE[5]))
         # semi-major axis: a = OE[0]/(1-OE[1]**2)
         return SV

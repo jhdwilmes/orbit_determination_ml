@@ -193,7 +193,7 @@ class orbitFunctions(object):
         return observation
 
 
-    def orbitSensorModelRt(self,xh):#,zh):
+    def orbitSensorModelRt(self,xh):#,zh): # output format = [az,el,rng,azrt,elrt], angles in degrees
         if(xh.ndim>1):
             xh = xh.flatten()
         time = self.time # zh[0] # need to ensure this is correct
@@ -233,6 +233,26 @@ class orbitFunctions(object):
         azel1 = coordinate_systems.horizon_to_az_elev(horizon1[0],horizon1[1],horizon1[2])
         azelrate = [azel1[0]*180/np.pi - azel[0], azel1[1]*180/np.pi - azel[1]]
         observation = np.array([azel[0],azel[1],rng,azelrate[0],azelrate[1],rngrate])
+        return observation
+
+
+    def orbitSensorModelAORts(self,xh):#,zh):
+        if(xh.ndim>1):
+            xh = xh.flatten()
+        time = self.time # zh[0] # need to ensure this is correct
+        t = utils.gstime_from_datetime(self.Jtime2Datetime(time))
+        ecef = coordinate_systems.eci_to_ecef(xh[0:3],t)
+        horizon = coordinate_systems.to_horizon(self.Sensor.latitude_rad,self.Sensor.longitude_rad,self.Sensor.position_ecef,ecef)
+        azel = coordinate_systems.horizon_to_az_elev(horizon[0],horizon[1],horizon[2])
+        azel = [azel[0]*180/np.pi, azel[1]*180/np.pi]
+        dt = 1 # timedelta in seconds for rate calculations
+        xh1 = self.orbitFunction6(xh,dt)
+        t1 = (t + dt/86400) % (np.pi * 2)
+        ecef1 = coordinate_systems.eci_to_ecef(xh1[0:3],t1)
+        horizon1 = coordinate_systems.to_horizon(self.Sensor.latitude_rad,self.Sensor.longitude_rad,self.Sensor.position_ecef,ecef1)
+        azel1 = coordinate_systems.horizon_to_az_elev(horizon1[0],horizon1[1],horizon1[2])
+        azelrate = [azel1[0]*180/np.pi - azel[0], azel1[1]*180/np.pi - azel[1]]
+        observation = np.array([azel[0],azel[1],azelrate[0],azelrate[1]])
         return observation
 
 
