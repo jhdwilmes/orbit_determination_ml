@@ -198,6 +198,91 @@ class orbitDetermination:
         return [times[iters[1]], x2, v2]
 
 
+    def range2orbit(self,range,timeset,angles,obsLocation,radecOrazel = 0,iters=[0,1,2]):
+        if len(timeset) < 3:
+            print('Insufficient data to calculate orbit')
+            return([0,np.array([0,0,0]),np.array([0,0,0])])
+        # format times
+        Rs = []
+        times = []
+        for t in timeset:
+            t1 = t
+            if type(t)!=type(datetime.datetime(1,1,1)):
+                t1 = self.Jday2DT(t)
+                times.append(t)
+            elif type(t)==type(datetime.datetime(1,1,1)):
+                times.append(self.Datetime2Jtime(t))
+            Rs.append(coordinate_systems.ecef_to_eci(obsLocation.position_ecef,utils.gstime_from_datetime(t1)))
+        # format angles
+        if(radecOrazel == 0):
+            ra = angles[0] * utils.pi / 180
+            dec = angles[1] * utils.pi / 180
+            rhos = np.transpose([np.cos(ra) * np.cos(dec), np.sin(ra) * np.cos(dec), np.sin(dec)])
+        elif(radecOrazel == 1):
+            az = angles[0] * utils.pi / 180 
+            el = angles[1] * utils.pi / 180
+            # rhos = np.transpose([np.sin(az) * np.cos(el), np.cos(az) * np.cos(el), np.sin(el)])
+            # rhos = self.QrotateVector(rhos,times[1],obsLocation,direction=1) # not sure if this is correct?
+            h,dec = self.AzEl2HDec(az,el,obsLocation)
+            siderealTime = self.siderealTime(times[1],obsLocation)
+            ra = h + siderealTime
+            rhos = np.transpose([np.cos(ra) * np.cos(dec), np.sin(ra) * np.cos(dec), np.sin(dec)])
+            # need to account for rotation into topocentric coordinates
+        else:
+            print('Need RaDec or AzEl angle coordinates inputed as the "angles" variable, and radecOrazel set to 0 for RaDec or 1 for AzEl.')
+            return 1
+        T1 = times[iters[0]] - times[iters[1]] # tau_1 # assumed julian dates, meaning the result should be fractions of a day
+        T3 = times[iters[2]] - times[iters[1]] # tau_3
+        T = T3 - T1 # tau
+        # convert time to seconds - note there might be numerical problems here if the time delta is too small
+        T1 = T1 * 86400
+        T3 = T3 * 86400
+        T  = T * 86400
+        # product vectors
+        p1 = np.cross(rhos[iters[1]],rhos[iters[2]]) # Rho2 x Rho3
+        p2 = np.cross(rhos[iters[0]],rhos[iters[2]]) # Rho1 x Rho3
+        p3 = np.cross(rhos[iters[0]],rhos[iters[1]]) # Rho1 x Rho2
+        D0 = np.dot(rhos[iters[0]],p1)
+        # label sensor locations at each time
+        R1 = Rs[iters[0]]
+        R2 = Rs[iters[1]]
+        R3 = Rs[iters[2]]
+        # create matrix coefficients
+        D11 = np.dot(R1,p1)
+        D12 = np.dot(R1,p2)
+        D13 = np.dot(R1,p3)
+        D21 = np.dot(R2,p1)
+        D22 = np.dot(R2,p2)
+        D23 = np.dot(R2,p3)
+        D31 = np.dot(R3,p1)
+        D32 = np.dot(R3,p2)
+        D33 = np.dot(R3,p3)
+        r2 = range
+        if len(np.array(range).shape) > 0:
+            try:
+                r2 = range[iters[1]]
+            except:
+                r2 = range[0]
+        A = 1 / D0 * (-D12 * T3 / T + D22 + D32 * T1 / T)
+        B = 1 / (6 * D0) * (D12 * (T3**2 - T**2) * T3 / T + D32 * (T**2 - T1**2) * T1 / T)
+        r1num = 6 * (D31 * T1 / T3 + D21 * T / T3) * r2**3 + utils.MU_E * D31 * (T**2 - T1**2) * T1 / T3
+        r1denom = 6 * r2**3 + utils.MU_E * (T**2 - T3**2)
+        rho1 = 1 / D0 * (r1num / r1denom - D11)
+        rho2 = A + utils.MU_E * B / r2**3
+        r3num = 6 * (D13 * T3 / T1 - D23 * T / T1) * r2**3 + utils.MU_E * D13 * (T**2 - T3**2) * T3 / T1
+        r3denom = 6 * r2**3 + utils.MU_E * (T**2 - T1**2)
+        rho3 = 1 / D0 * (r3num / r3denom - D33)
+        x1 = R1 + rho1 * rhos[iters[0]]
+        x2 = R2 + rho2 * rhos[iters[1]]
+        x3 = R3 + rho3 * rhos[iters[2]]
+        f1 = 1 - 0.5 * utils.MU_E * T1**2 / r2**3
+        f3 = 1 - 0.5 * utils.MU_E * T3**2 / r2**3
+        g1 = T1 - utils.MU_E / (6 * r2**3) * T1**3
+        g3 = T3 - utils.MU_E / (6 * r2**3) * T3**3
+        v2 = 1 / (f1 * g3 - f3 * g1) * (-f3 * x1 + f1 * x3)
+        return [times[iters[1]], x2, v2]
+
+
     def StateVector2OrbitalElements(self,SV):
         OE = np.array(keplerian.rv2coe(utils.MU_E,SV[1],SV[2]))
         if np.isnan(OE[0]):

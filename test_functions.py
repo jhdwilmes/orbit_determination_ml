@@ -425,7 +425,17 @@ class testML():
                 datasetforestrange.append(UKF.x)
             for jj in range(len(forestOrbitModels)):
                 output = self.testForests(forestOrbitModels[jj],observer=observer)
-                
+
+
+    def logData(self,data,methodname='',filename='plots/orbit_results.csv',firstline=0):
+        f = open('plots/orbit_results.csv','a+')
+        if firstline: # unsure if TA or MA
+            f.write('Method,MM-median,MM-5th,MM-95th,I-median,I-5th,I-95th,E-median,E-5th,E-95th,RA-median,RA-5th,RA-95th,AP-median,AP-5th,AP-95th,TA-median,TA-5th,TA-95th\n')
+        f.write(methodname)
+        for num in range(6):
+            f.write(','+str(np.median(data[3,:,num]))+','+str(np.percentile(data[3,:,num],5))+','+str(np.percentile(data[3,:,num],95)))
+        f.write('\n')
+        f.close()
 
 
     # def testNN(self,model,dataseting=4,eval_size = 100,num_tles = 1000,obs_noise=.02,max_obs=10,rangenorm=72000):
