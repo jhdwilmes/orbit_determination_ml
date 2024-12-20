@@ -317,7 +317,7 @@ class orbitDetermination:
     
 
     def StateVector2OrbitalElements2(self,SV):
-        OE = np.array(keplerian.rv2coe(utils.MU_E,np.copt(SV[1]),np.copy(SV[2])))
+        OE = np.array(keplerian.rv2coe(utils.MU_E,np.copy(SV[1]),np.copy(SV[2])))
         a = OE[0]/(1-OE[1]**2)
         T = utils.pi*2*np.sqrt(a**3/utils.MU_E) # orbit period
         OE[0] = T

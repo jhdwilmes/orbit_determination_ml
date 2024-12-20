@@ -80,8 +80,10 @@ UKF2  = UnscentedKalmanFilter(dim_x=dim, dim_z=4, dt=dt, fx=OF.orbitFunction6, h
 # UKFr.P *= 0.9
 # UKF.P *= 0.9
 UKFr.R = np.diag([0.02,0.02,99.9]) # measurement error?
-UKF.R = np.diag([9.5,9.5]) # measurement error?
-UKF2.R = np.diag([9.5,9.5,9.1,9.1]) # measurement error?
+# UKF.R = np.diag([9.5,9.5]) # measurement error?
+UKF.R = np.diag([0.1,0.1]) # measurement error?
+# UKF2.R = np.diag([9.5,9.5,9.1,9.1]) # measurement error?
+UKF2.R = np.diag([0.1,0.1,1.0,1.0]) # measurement error?
 UKFr2.R = np.diag([0.02,0.02,99.9,.03,.03]) # measurement error?
 UKFr3.R = np.diag([0.02,0.02,99.9,.03,.03,5]) # measurement error?
 # UKF.Q = 
@@ -98,7 +100,7 @@ gausoln3 = orbdet.GaussOrbitDetermination(o1[0],[o1[6].astype(float),o1[7].astyp
 # print(arc_iod.df.to_string())
 
 
-estsoln = [o1[0][1],np.array(w[1]),(np.array(w[2])-np.array(w[0]))/((o1[0][2]-o1[0][0])*86400)]
+estsoln = [o1[0][1],np.array(w[1][0:3]),np.array(w[1][3:])]
 
 speed = (np.array(w[2])-np.array(w[0]))/((o1[0][2]-o1[0][0])*86400)
 impute = np.array([w[1][0],w[1][1],w[1][2],speed[0],speed[1],speed[2]])

@@ -34,7 +34,7 @@ dataseting2 = 5
 dnntype = 0
 dnntype1 = 0
 dnntype2 = 2
-test_size = 1000
+test_size = 20
 dt = 10
 num_tles = 10000
 obs_noise = .004 # .02 is 1.2 arcminutes, .004 ~15 arcseconds, .0003 ~1.1 arcseconds
@@ -102,7 +102,7 @@ num_tles = len(TF.TLE.tles)
 points = sigma_points.MerweScaledSigmaPoints(6, alpha=.01, beta=2., kappa=-3)
 UKF  = UnscentedKalmanFilter(dim_x=6, dim_z=5, dt=dt, fx=TF.OF.orbitFunction6, hx=TF.OF.orbitSensorModelRt, points=points)
 UKF.P = np.diag([1e6,1e6,1e6,1e2,1e2,1e2])
-UKF.R = np.diag([obs_noise,obs_noise,1e2,obs_noise*2,obs_noise*2])
+UKF.R = np.diag([obs_noise,obs_noise,1e3,obs_noise*2,obs_noise*2])
 datakf = []
 datann = []
 # for ii in range(len(kfmodels)):

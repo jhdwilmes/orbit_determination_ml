@@ -83,7 +83,7 @@ rft = ensemble.RandomForestRegressor(n_estimators = estimators, warm_start=True,
 etr = ensemble.ExtraTreesRegressor(n_estimators = estimators,warm_start=True,max_depth=10) # can only train once
 abr = ensemble.AdaBoostRegressor(n_estimators=1000,learning_rate=0.5) # joblib.load('adaboost_save_'+str(datalength)) # ensemble.AdaBoostRegressor(n_estimators=estimators,learning_rate=0.9) # can train repeatedly
 bgr = ensemble.BaggingRegressor(n_estimators=2000,warm_start=True) # joblib.load('bagging_save_'+str(datalength)) # ensemble.BaggingRegressor(n_estimators=estimators) # can train repeatedly
-gbr = ensemble.GradientBoostingRegressor(n_estimators=2000,learning_rate=0.1) # joblib.load('gradientboost_save_'+str(datalength)) # ensemble.GradientBoostingRegressor(n_estimators=estimators) # can train repeatedly
+gbr = ensemble.GradientBoostingRegressor(n_estimators=2000,learning_rate=0.1,max_depth=3) # joblib.load('gradientboost_save_'+str(datalength)) # ensemble.GradientBoostingRegressor(n_estimators=estimators) # can train repeatedly
 hbr = ensemble.HistGradientBoostingRegressor(learning_rate=0.1,max_iter=300,max_depth=20) # joblib.load('histgradboost_save_'+str(datalength)) # ensemble.HistGradientBoostingRegressor() # can train repeatedly
 nn0 = neural_network.MLPRegressor(hidden_layer_sizes=(300),activation='relu',max_iter=int(n_epochs*batch_size))
 # nn0 = joblib.load('sknn_save_'+str(datalength))
